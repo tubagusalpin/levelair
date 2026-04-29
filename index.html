@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SCADA Monitoring Tangki Air</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    .scada-root {
+      background: #0a0e1a;
+      color: #c8d8f0;
+      font-family: 'Exo 2', sans-serif;
+      padding: 0;
+      min-height: 100vh;
+    }
+
+    .scada-header {
+      background: #0d1220;
+      border-bottom: 1px solid #1e3a5f;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .scada-title {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 14px;
+      letter-spacing: 3px;
+      color: #4fc3f7;
+      text-transform: uppercase;
+    }
+
+    .scada-time {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      color: #4a6fa5;
+    }
+
+    .scada-status-bar {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .dot-online { width: 8px; height: 8px; border-radius: 50%; background: #00e676; animation: blink 1.5s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    .online-label { font-size: 11px; color: #00e676; font-family: 'Share Tech Mono', monospace; }
+
+    .main-layout {
+      display: grid;
+      grid-template-columns: 220px 1fr 260px;
+      gap: 12px;
+      padding: 12px;
+      align-items: start;
+    }
+
+    .tank-panel {
+      background: #0d1220;
+      border: 1px solid #1e3a5f;
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .tank-label {
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: #4a6fa5;
+      text-transform: uppercase;
+      font-family: 'Share Tech Mono', monospace;
+    }
+
+    .tank-visual-wrap {
+      position: relative;
+      width: 110px;
+      height: 200px;
+    }
+
+    .tank-svg { width: 110px; height: 200px; }
+
+    .tank-pct-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 22px;
+      font-weight: 600;
+      color: #4fc3f7;
+      text-align: center;
+    }
+
+    .tank-info-grid {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .tank-info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 10px;
+      background: #0a0e1a;
+      border: 1px solid #1a2a3f;
+      border-radius: 4px;
+    }
+
+    .tank-info-key { font-size: 10px; color: #4a6fa5; letter-spacing: 1px; text-transform: uppercase; }
+    .tank-info-val { font-family: 'Share Tech Mono', monospace; font-size: 13px; color: #4fc3f7; }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+    }
+
+    .metric-card {
+      background: #0d1220;
+      border: 1px solid #1e3a5f;
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .metric-title {
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: #4a6fa5;
+      text-transform: uppercase;
+    }
+
+    .donut-wrap { position: relative; width: 90px; height: 90px; }
+    .donut-val {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 16px;
+      font-weight: 600;
+      color: #c8d8f0;
+    }
+
+    .pump-card {
+      background: #0d1220;
+      border: 1px solid #1e3a5f;
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pump-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      border: 2px solid;
+    }
+
+    .pump-on { border-color: #00e676; background: rgba(0,230,118,0.1); color: #00e676; }
+    .pump-off { border-color: #f44336; background: rgba(244,67,54,0.1); color: #f44336; }
+
+    .pump-badge {
+      padding: 4px 18px;
+      border-radius: 3px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 2px;
+    }
+
+    .badge-on { background: #00e676; color: #001a0a; }
+    .badge-off { background: #f44336; color: #fff; }
+
+    .status-card {
+      background: #0d1220;
+      border: 1px solid #1e3a5f;
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-badge {
+      padding: 6px 20px;
+      border-radius: 4px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-align: center;
+    }
+
+    .status-normal { background: #00c853; color: #002a00; }
+    .status-warning { background: #ff6d00; color: #fff; animation: flashWarn 0.8s infinite; }
+    .status-danger { background: #f44336; color: #fff; animation: flashWarn 0.6s infinite; }
+    @keyframes flashWarn { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+    .val-card {
+      background: #0d1220;
+      border: 1px solid #1e3a5f;
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .val-number {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 20px;
+      color: #4fc3f7;
+    }
+
+    .val-unit { font-size: 10px; color: #4a6fa5; letter-spacing: 1px; }
+
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .chart-card {
+      background: #0d1220;
+      border: 1px solid #1e3a5f;
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .chart-title {
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: #4a6fa5;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .telegram-panel {
+      background: #0d1220;
+      border: 1px solid #1e3a5f;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .tg-header {
+      background: #0d1220;
+      border-bottom: 1px solid #1a2a3f;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .tg-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #0088cc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: #fff;
+      font-family: 'Share Tech Mono', monospace;
+      font-weight: 700;
+    }
+
+    .tg-botname { font-size: 13px; color: #c8d8f0; font-weight: 600; }
+    .tg-botsub { font-size: 10px; color: #4a6fa5; }
+
+    .tg-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 520px;
+    }
+
+    .tg-msg {
+      background: #162035;
+      border: 1px solid #1e3a5f;
+      border-radius: 8px;
+      border-top-left-radius: 2px;
+      padding: 8px 10px;
+      max-width: 95%;
+    }
+
+    .tg-msg-type {
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      font-family: 'Share Tech Mono', monospace;
+    }
+
+    .tg-msg-text { font-size: 11px; color: #9ab0cc; line-height: 1.5; }
+    .tg-msg-time { font-size: 9px; color: #3a5070; margin-top: 4px; text-align: right; font-family: 'Share Tech Mono', monospace; }
+
+    .msg-alert .tg-msg-type { color: #ff6d00; }
+    .msg-danger .tg-msg-type { color: #f44336; }
+    .msg-ok .tg-msg-type { color: #00e676; }
+    .msg-info .tg-msg-type { color: #4fc3f7; }
+
+    .msg-alert { border-left: 3px solid #ff6d00; }
+    .msg-danger { border-left: 3px solid #f44336; }
+    .msg-ok { border-left: 3px solid #00e676; }
+    .msg-info { border-left: 3px solid #4fc3f7; }
+
+    .tg-input-area {
+      padding: 8px;
+      border-top: 1px solid #1a2a3f;
+      display: flex;
+      gap: 6px;
+    }
+
+    .tg-input {
+      flex: 1;
+      background: #0a0e1a;
+      border: 1px solid #1e3a5f;
+      border-radius: 16px;
+      padding: 6px 12px;
+      font-size: 11px;
+      color: #6a8aaa;
+      font-family: 'Exo 2', sans-serif;
+      outline: none;
+    }
+
+    .tg-send-btn {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: #0088cc;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .center-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .section-divider {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+    }
+
+    .threshold-indicator {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      margin-top: 4px;
+    }
+
+    .thr-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .thr-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .thr-label { font-size: 9px; color: #4a6fa5; font-family: 'Share Tech Mono', monospace; }
+
+    .new-msg-badge {
+      background: #f44336;
+      color: #fff;
+      font-size: 9px;
+      border-radius: 8px;
+      padding: 1px 5px;
+      font-family: 'Share Tech Mono', monospace;
+      animation: blink 1s infinite;
+    }
+
+    /* === REKAP PANEL === */
+    .rekap-panel {
+      background: #0d1220;
+      border: 1px solid #1e3a5f;
+      border-radius: 8px;
+      padding: 14px;
+      margin: 0 12px 12px 12px;
+    }
+
+    .rekap-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .rekap-title {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: #4fc3f7;
+      text-transform: uppercase;
+    }
+
+    .rekap-actions { display: flex; gap: 8px; }
+
+    .rekap-table-wrap {
+      overflow-x: auto;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .rekap-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+    }
+
+    .rekap-table th {
+      background: #0a0e1a;
+      color: #4a6fa5;
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 6px 10px;
+      border-bottom: 1px solid #1e3a5f;
+      text-align: left;
+      position: sticky;
+      top: 0;
+    }
+
+    .rekap-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #0d1628;
+      color: #9ab0cc;
+      font-size: 11px;
+    }
+
+    .rekap-table tr:hover td { background: #162035; }
+
+    .td-level { color: #4fc3f7; font-weight: 600; }
+    .td-status-normal { color: #00e676; }
+    .td-status-warning { color: #ff6d00; }
+    .td-status-danger { color: #f44336; }
+
+    .btn-export {
+      font-size: 10px; padding: 5px 12px; background: #0088cc;
+      color: #fff; border: none; border-radius: 4px; cursor: pointer;
+      font-family: 'Share Tech Mono', monospace; letter-spacing: 1px;
+    }
+
+    .btn-clear {
+      font-size: 10px; padding: 5px 12px; background: #1e3a5f;
+      color: #c8d8f0; border: none; border-radius: 4px; cursor: pointer;
+      font-family: 'Share Tech Mono', monospace; letter-spacing: 1px;
+    }
+
+    .rekap-stat-row {
+      display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap;
+    }
+
+    .rekap-stat {
+      background: #0a0e1a; border: 1px solid #1a2a3f; border-radius: 4px;
+      padding: 6px 14px; display: flex; flex-direction: column;
+      align-items: center; gap: 2px; min-width: 80px;
+    }
+
+    .rekap-stat-label { font-size: 9px; color: #4a6fa5; letter-spacing: 1px; text-transform: uppercase; }
+    .rekap-stat-val { font-family: 'Share Tech Mono', monospace; font-size: 14px; color: #4fc3f7; }
+  </style>
+</head>
+<body>
+
+<div class="scada-root">
+
+  <div class="scada-header">
+    <div class="scada-title">SCADA Monitoring Tangki Air</div>
+    <div class="scada-status-bar">
+      <div class="dot-online"></div>
+      <span class="online-label">ONLINE</span>
+      <span class="scada-time" id="clock">--:--:--</span>
+    </div>
+  </div>
+
+  <div class="main-layout">
+
+    <!-- KIRI: Tank Visual -->
+    <div class="tank-panel">
+      <div class="tank-label">Water Level</div>
+      <div class="tank-visual-wrap">
+        <svg class="tank-svg" viewBox="0 0 110 200" id="tankSvg">
+          <defs>
+            <clipPath id="tankClip">
+              <rect x="10" y="10" width="90" height="175" rx="6"/>
+            </clipPath>
+          </defs>
+          <rect x="10" y="10" width="90" height="175" rx="6" fill="none" stroke="#1e3a5f" stroke-width="2"/>
+          <rect x="10" y="10" width="90" height="175" rx="6" fill="#0a0e1a" clip-path="url(#tankClip)"/>
+          <rect id="waterFill" x="10" y="97" width="90" height="88" fill="#1565c0" clip-path="url(#tankClip)" rx="0"/>
+          <path id="wavePath" d="M10,97 Q37,91 55,97 Q73,103 90,97 L90,185 L10,185 Z" fill="#1976d2" clip-path="url(#tankClip)" opacity="0.7"/>
+          <line x1="55" y1="10" x2="55" y2="185" stroke="#0d47a1" stroke-width="0.5" stroke-dasharray="4,4" opacity="0.4"/>
+          <line x1="10" y1="52" x2="100" y2="52" stroke="#4a6fa5" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.5"/>
+          <text x="103" y="55" fill="#4a6fa5" font-size="8" font-family="Share Tech Mono,monospace">75%</text>
+          <line x1="10" y1="97" x2="100" y2="97" stroke="#4a6fa5" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.5"/>
+          <text x="103" y="100" fill="#4a6fa5" font-size="8" font-family="Share Tech Mono,monospace">50%</text>
+          <line x1="10" y1="141" x2="100" y2="141" stroke="#f44336" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.7"/>
+          <text x="103" y="144" fill="#f44336" font-size="8" font-family="Share Tech Mono,monospace">20%</text>
+          <text id="tankPctSvg" x="55" y="135" fill="#4fc3f7" font-size="18" font-family="Share Tech Mono,monospace" text-anchor="middle" font-weight="700">50%</text>
+        </svg>
+      </div>
+      <div class="tank-info-grid">
+        <div class="tank-info-row">
+          <span class="tank-info-key">Volume</span>
+          <span class="tank-info-val" id="volumeVal">1007 L</span>
+        </div>
+        <div class="tank-info-row">
+          <span class="tank-info-key">Distance</span>
+          <span class="tank-info-val" id="distVal">50 cm</span>
+        </div>
+        <div class="tank-info-row">
+          <span class="tank-info-key">Level</span>
+          <span class="tank-info-val" id="levelVal">50%</span>
+        </div>
+        <div class="tank-info-row">
+          <span class="tank-info-key">Max Tank</span>
+          <span class="tank-info-val">100 cm</span>
+        </div>
+      </div>
+      <div class="threshold-indicator">
+        <div class="thr-item">
+          <div class="thr-dot" style="background:#f44336"></div>
+          <span class="thr-label">LOW</span>
+        </div>
+        <div class="thr-item">
+          <div class="thr-dot" style="background:#ff6d00"></div>
+          <span class="thr-label">MED</span>
+        </div>
+        <div class="thr-item">
+          <div class="thr-dot" style="background:#00e676"></div>
+          <span class="thr-label">FULL</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TENGAH -->
+    <div class="center-panel">
+      <div class="section-divider">
+        <div class="metric-card">
+          <span class="metric-title">Temperature</span>
+          <div class="donut-wrap">
+            <canvas id="tempDonut"></canvas>
+            <div class="donut-val" id="tempVal">33°C</div>
+          </div>
+        </div>
+        <div class="metric-card">
+          <span class="metric-title">Humidity</span>
+          <div class="donut-wrap">
+            <canvas id="humDonut"></canvas>
+            <div class="donut-val" id="humVal">61%</div>
+          </div>
+        </div>
+        <div class="pump-card">
+          <span class="metric-title">Pump</span>
+          <div class="pump-icon pump-off" id="pumpIcon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/>
+            </svg>
+          </div>
+          <div class="pump-badge badge-off" id="pumpBadge">OFF</div>
+          <div style="display:flex;gap:6px;margin-top:4px;">
+            <button onclick="setPump(true)" style="font-size:10px;padding:4px 10px;background:#00e676;color:#001a0a;border:none;border-radius:3px;cursor:pointer;font-family:'Share Tech Mono',monospace;letter-spacing:1px;">ON</button>
+            <button onclick="setPump(false)" style="font-size:10px;padding:4px 10px;background:#f44336;color:#fff;border:none;border-radius:3px;cursor:pointer;font-family:'Share Tech Mono',monospace;letter-spacing:1px;">OFF</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-divider">
+        <div class="status-card">
+          <span class="metric-title">Status</span>
+          <div class="status-badge status-normal" id="statusBadge">NORMAL</div>
+          <div style="font-size:9px;color:#4a6fa5;margin-top:4px;font-family:'Share Tech Mono',monospace;" id="statusDesc">Sistem berjalan normal</div>
+        </div>
+        <div class="val-card">
+          <span class="metric-title">Volume</span>
+          <div class="val-number" id="volCard">1007 L</div>
+          <div class="val-unit">LITER</div>
+        </div>
+        <div class="val-card">
+          <span class="metric-title">Distance</span>
+          <div class="val-number" id="distCard">50 cm</div>
+          <div class="val-unit">CENTIMETER</div>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-title">Water Level History</div>
+          <div style="position:relative;height:120px;">
+            <canvas id="levelChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Temperature History</div>
+          <div style="position:relative;height:120px;">
+            <canvas id="tempChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Humidity History</div>
+          <div style="position:relative;height:120px;">
+            <canvas id="humChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button onclick="simulateLevel(5)" style="font-size:10px;padding:5px 12px;background:#f44336;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:'Share Tech Mono',monospace;letter-spacing:1px;">Sim: Air Habis (5%)</button>
+        <button onclick="simulateLevel(50)" style="font-size:10px;padding:5px 12px;background:#ff6d00;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:'Share Tech Mono',monospace;letter-spacing:1px;">Sim: Sedang (50%)</button>
+        <button onclick="simulateLevel(95)" style="font-size:10px;padding:5px 12px;background:#00e676;color:#001a0a;border:none;border-radius:4px;cursor:pointer;font-family:'Share Tech Mono',monospace;letter-spacing:1px;">Sim: Penuh (95%)</button>
+        <button onclick="simulateLevel(15)" style="font-size:10px;padding:5px 12px;background:#9c27b0;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:'Share Tech Mono',monospace;letter-spacing:1px;">Sim: Kritis (15%)</button>
+      </div>
+    </div>
+
+    <!-- KANAN: Telegram + Threshold -->
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div class="telegram-panel">
+        <div class="tg-header">
+          <div class="tg-icon">TG</div>
+          <div>
+            <div class="tg-botname">WaterTankBot <span class="new-msg-badge" id="newBadge" style="display:none;">NEW</span></div>
+            <div class="tg-botsub">Notifikasi Real-Time ESP32</div>
+          </div>
+        </div>
+        <div class="tg-messages" id="tgMessages">
+          <div class="tg-msg msg-ok">
+            <div class="tg-msg-type">SISTEM AKTIF</div>
+            <div class="tg-msg-text">ESP32 terhubung ke server.<br>Monitoring tangki air dimulai.</div>
+            <div class="tg-msg-time">09:00:01</div>
+          </div>
+          <div class="tg-msg msg-info">
+            <div class="tg-msg-type">INFO</div>
+            <div class="tg-msg-text">Level air: 50% | Volume: 1007 L<br>Distance: 50 cm | Suhu: 33°C<br>Status: NORMAL</div>
+            <div class="tg-msg-time">09:00:05</div>
+          </div>
+        </div>
+        <div class="tg-input-area">
+          <input class="tg-input" placeholder="Pesan otomatis dari ESP32..." readonly/>
+          <div class="tg-send-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#0d1220;border:1px solid #1e3a5f;border-radius:8px;padding:12px;">
+        <div style="font-size:10px;letter-spacing:2px;color:#4a6fa5;text-transform:uppercase;margin-bottom:10px;font-family:'Share Tech Mono',monospace;">Threshold Config</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:10px;color:#f44336;font-family:'Share Tech Mono',monospace;">KRITIS (Pompa ON)</span>
+            <span style="font-size:12px;color:#f44336;font-family:'Share Tech Mono',monospace;">&lt; 20%</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:10px;color:#ff6d00;font-family:'Share Tech Mono',monospace;">RENDAH (Alert)</span>
+            <span style="font-size:12px;color:#ff6d00;font-family:'Share Tech Mono',monospace;">20–40%</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:10px;color:#00e676;font-family:'Share Tech Mono',monospace;">NORMAL</span>
+            <span style="font-size:12px;color:#00e676;font-family:'Share Tech Mono',monospace;">40–90%</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:10px;color:#4fc3f7;font-family:'Share Tech Mono',monospace;">PENUH (Pompa OFF)</span>
+            <span style="font-size:12px;color:#4fc3f7;font-family:'Share Tech Mono',monospace;">&gt; 90%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- REKAP DATA -->
+  <div class="rekap-panel">
+    <div class="rekap-header">
+      <div class="rekap-title">📊 Rekap Data Monitoring</div>
+      <div class="rekap-actions">
+        <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+        <button class="btn-clear" onclick="clearRekap()">🗑 Clear</button>
+      </div>
+    </div>
+    <div class="rekap-stat-row">
+      <div class="rekap-stat"><span class="rekap-stat-label">Total Rekap</span><span class="rekap-stat-val" id="statTotal">0</span></div>
+      <div class="rekap-stat"><span class="rekap-stat-label">Avg Level</span><span class="rekap-stat-val" id="statAvgLevel">-</span></div>
+      <div class="rekap-stat"><span class="rekap-stat-label">Min Level</span><span class="rekap-stat-val" id="statMinLevel">-</span></div>
+      <div class="rekap-stat"><span class="rekap-stat-label">Max Level</span><span class="rekap-stat-val" id="statMaxLevel">-</span></div>
+      <div class="rekap-stat"><span class="rekap-stat-label">Avg Temp</span><span class="rekap-stat-val" id="statAvgTemp">-</span></div>
+      <div class="rekap-stat"><span class="rekap-stat-label">Alarm Count</span><span class="rekap-stat-val" id="statAlarm" style="color:#f44336;">0</span></div>
+    </div>
+    <div class="rekap-table-wrap" style="margin-top:12px;">
+      <table class="rekap-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Waktu</th><th>Level (%)</th><th>Volume (L)</th>
+            <th>Jarak (cm)</th><th>Suhu (°C)</th><th>Kelembapan (%)</th>
+            <th>Pompa</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="rekapBody">
+          <tr><td colspan="9" style="text-align:center;color:#3a5070;padding:16px;">Menunggu data masuk...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let currentLevel = 50, currentTemp = 33, currentHum = 61, pumpOn = false;
+let rekapData = [];
+
+const levelHistory = [48,50,51,50,49,50,50,51,50,50,50,50];
+const tempHistory  = [32,33,33,32,33,34,33,33,32,33,33,33];
+const humHistory   = [60,61,61,62,61,60,61,62,61,60,61,61];
+const timeLabels   = ['09:00','09:01','09:02','09:03','09:04','09:05','09:06','09:07','09:08','09:09','09:10','09:11'];
+
+function makeLineChart(id, data, color, label, min, max) {
+  return new Chart(document.getElementById(id), {
+    type: 'line',
+    data: { labels: timeLabels, datasets: [{ label, data, borderColor: color, backgroundColor: color+'22', borderWidth: 1.5, pointRadius: 2, pointBackgroundColor: color, fill: true, tension: 0.4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: '#4a6fa5', font: { size: 8 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 4 }, grid: { color: '#1a2a3f' } },
+                y: { ticks: { color: '#4a6fa5', font: { size: 8 } }, grid: { color: '#1a2a3f' }, min, max } } }
+  });
+}
+
+function makeDonut(id, value, color, max) {
+  return new Chart(document.getElementById(id), {
+    type: 'doughnut',
+    data: { datasets: [{ data: [value, max-value], backgroundColor: [color,'#1a2a3f'], borderWidth: 0, borderRadius: 3 }] },
+    options: { responsive: true, maintainAspectRatio: true, cutout: '72%', plugins: { legend: { display: false }, tooltip: { enabled: false } } }
+  });
+}
+
+const tempDonut  = makeDonut('tempDonut', 33, '#4fc3f7', 60);
+const humDonut   = makeDonut('humDonut', 61, '#00e676', 100);
+const levelChart = makeLineChart('levelChart', levelHistory, '#4fc3f7', 'Level', 0, 100);
+const tempChart  = makeLineChart('tempChart',  tempHistory,  '#ff9800', 'Temp',  20, 50);
+const humChart   = makeLineChart('humChart',   humHistory,   '#00e676', 'Hum',   40, 100);
+
+function updateClock() { document.getElementById('clock').textContent = new Date().toLocaleTimeString('id-ID'); }
+setInterval(updateClock, 1000); updateClock();
+
+function updateTank(level) {
+  const maxH=175, topY=10, fillH=(level/100)*maxH, fillY=topY+maxH-fillH;
+  document.getElementById('waterFill').setAttribute('y', fillY);
+  document.getElementById('waterFill').setAttribute('height', fillH);
+  document.getElementById('wavePath').setAttribute('d', `M10,${fillY} Q37,${fillY-6} 55,${fillY} Q73,${fillY+6} 100,${fillY} L100,185 L10,185 Z`);
+  document.getElementById('tankPctSvg').setAttribute('y', Math.max(fillY+25,170));
+  document.getElementById('tankPctSvg').textContent = level+'%';
+  const dist=Math.round((1-level/100)*100), vol=Math.round(level*20.14);
+  document.getElementById('volumeVal').textContent = vol+' L';
+  document.getElementById('distVal').textContent   = dist+' cm';
+  document.getElementById('levelVal').textContent  = level+'%';
+  document.getElementById('volCard').textContent   = vol+' L';
+  document.getElementById('distCard').textContent  = dist+' cm';
+}
+
+function updateStatus(level) {
+  const badge=document.getElementById('statusBadge'), desc=document.getElementById('statusDesc');
+  if (level<=15)      { badge.className='status-badge status-danger'; badge.textContent='AIR KRITIS!'; desc.textContent='Level sangat rendah - darurat'; setPump(true); }
+  else if (level<=20) { badge.className='status-badge status-danger'; badge.textContent='AIR HAMPIR HABIS!'; desc.textContent='Pompa dinyalakan otomatis'; setPump(true); }
+  else if (level<=40) { badge.className='status-badge status-warning'; badge.textContent='LEVEL RENDAH'; desc.textContent='Perlu perhatian segera'; }
+  else if (level>=92) { badge.className='status-badge status-normal'; badge.textContent='TANGKI PENUH'; desc.textContent='Pompa dimatikan otomatis'; setPump(false); }
+  else                { badge.className='status-badge status-normal'; badge.textContent='NORMAL'; desc.textContent='Sistem berjalan normal'; }
+}
+
+function setPump(on) {
+  pumpOn=on;
+  document.getElementById('pumpIcon').className = 'pump-icon '+(on?'pump-on':'pump-off');
+  document.getElementById('pumpBadge').className = 'pump-badge '+(on?'badge-on':'badge-off');
+  document.getElementById('pumpBadge').textContent = on?'ON':'OFF';
+}
+
+function addTelegramMsg(type, typeLabel, text) {
+  const msgs=document.getElementById('tgMessages'), time=new Date().toLocaleTimeString('id-ID');
+  const div=document.createElement('div');
+  div.className=`tg-msg msg-${type}`;
+  div.innerHTML=`<div class="tg-msg-type">${typeLabel}</div><div class="tg-msg-text">${text}</div><div class="tg-msg-time">${time}</div>`;
+  msgs.appendChild(div); msgs.scrollTop=msgs.scrollHeight;
+  const nb=document.getElementById('newBadge'); nb.style.display='inline';
+  setTimeout(()=>nb.style.display='none',3000);
+}
+
+function getStatusLabel(level) {
+  if (level<=15) return 'KRITIS';
+  if (level<=20) return 'HAMPIR HABIS';
+  if (level<=40) return 'RENDAH';
+  if (level>=92) return 'PENUH';
+  return 'NORMAL';
+}
+
+function addRekap(level, temp, hum, pump) {
+  const dist=Math.round((1-level/100)*100), vol=Math.round(level*20.14);
+  rekapData.push({ waktu: new Date().toLocaleString('id-ID'), level, vol, dist, temp, hum, pump: pump?'ON':'OFF', status: getStatusLabel(level) });
+  renderRekap(); updateRekapStats();
+}
+
+function renderRekap() {
+  const tbody=document.getElementById('rekapBody');
+  tbody.innerHTML='';
+  [...rekapData].reverse().forEach((row,idx) => {
+    const sc = row.status==='KRITIS'||row.status==='HAMPIR HABIS'?'td-status-danger': row.status==='RENDAH'?'td-status-warning':'td-status-normal';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${rekapData.length-idx}</td><td>${row.waktu}</td><td class="td-level">${row.level}%</td><td>${row.vol}</td><td>${row.dist}</td><td>${row.temp}</td><td>${row.hum}</td><td style="color:${row.pump==='ON'?'#00e676':'#f44336'}">${row.pump}</td><td class="${sc}">${row.status}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function updateRekapStats() {
+  if (!rekapData.length) return;
+  const levels=rekapData.map(r=>r.level), temps=rekapData.map(r=>r.temp);
+  document.getElementById('statTotal').textContent    = rekapData.length;
+  document.getElementById('statAvgLevel').textContent = (levels.reduce((a,b)=>a+b,0)/levels.length).toFixed(1)+'%';
+  document.getElementById('statMinLevel').textContent = Math.min(...levels)+'%';
+  document.getElementById('statMaxLevel').textContent = Math.max(...levels)+'%';
+  document.getElementById('statAvgTemp').textContent  = (temps.reduce((a,b)=>a+b,0)/temps.length).toFixed(1)+'°C';
+  document.getElementById('statAlarm').textContent    = rekapData.filter(r=>r.status==='KRITIS'||r.status==='HAMPIR HABIS').length;
+}
+
+function clearRekap() {
+  if (confirm('Hapus semua rekap data?')) {
+    rekapData=[];
+    document.getElementById('rekapBody').innerHTML='<tr><td colspan="9" style="text-align:center;color:#3a5070;padding:16px;">Data dihapus.</td></tr>';
+    ['statAvgLevel','statMinLevel','statMaxLevel','statAvgTemp'].forEach(id=>document.getElementById(id).textContent='-');
+    document.getElementById('statTotal').textContent=document.getElementById('statAlarm').textContent='0';
+  }
+}
+
+function exportCSV() {
+  if (!rekapData.length) { alert('Tidak ada data.'); return; }
+  const header=['No','Waktu','Level(%)','Volume(L)','Jarak(cm)','Suhu(C)','Kelembapan(%)','Pompa','Status'];
+  const rows=rekapData.map((r,i)=>[i+1,r.waktu,r.level,r.vol,r.dist,r.temp,r.hum,r.pump,r.status]);
+  const csv=[header,...rows].map(r=>r.join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=`scada_rekap_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+function simulateLevel(level) {
+  currentLevel=level; updateTank(level); updateStatus(level);
+  levelHistory.push(level); levelHistory.shift();
+  levelChart.data.datasets[0].data=[...levelHistory];
+  const now=new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+  levelChart.data.labels.push(now); levelChart.data.labels.shift(); levelChart.update('none');
+  const dist=Math.round((1-level/100)*100), vol=Math.round(level*20.14);
+  if (level<=15)      addTelegramMsg('danger','DARURAT',`Level air KRITIS: ${level}%\nVolume: ${vol} L | Jarak: ${dist} cm\nPompa ON otomatis! Segera periksa!`);
+  else if (level<=20) addTelegramMsg('danger','AIR HAMPIR HABIS',`Level air: ${level}% (sangat rendah)\nVolume: ${vol} L | Jarak sensor: ${dist} cm\nPompa dinyalakan otomatis.`);
+  else if (level<=40) addTelegramMsg('alert','PERINGATAN',`Level air rendah: ${level}%\nVolume: ${vol} L | Jarak: ${dist} cm\nPerlu perhatian segera.`);
+  else if (level>=92) addTelegramMsg('ok','TANGKI PENUH',`Tangki sudah penuh: ${level}%\nVolume: ${vol} L | Jarak: ${dist} cm\nPompa dimatikan otomatis.`);
+  else                addTelegramMsg('info','UPDATE STATUS',`Level air: ${level}% (normal)\nVolume: ${vol} L | Jarak: ${dist} cm\nSuhu: ${currentTemp}°C | Kelembapan: ${currentHum}%`);
+  addRekap(level, currentTemp, currentHum, pumpOn);
+}
+
+setInterval(() => {
+  const delta=(Math.random()-0.5)*2;
+  currentTemp=Math.round(Math.min(50,Math.max(20,currentTemp+delta*0.3)));
+  currentHum=Math.round(Math.min(100,Math.max(30,currentHum+delta*0.2)));
+  document.getElementById('tempVal').textContent=currentTemp+'°C';
+  document.getElementById('humVal').textContent=currentHum+'%';
+  tempDonut.data.datasets[0].data=[currentTemp,60-currentTemp];
+  humDonut.data.datasets[0].data=[currentHum,100-currentHum];
+  tempDonut.update('none'); humDonut.update('none');
+  tempHistory.push(currentTemp); tempHistory.shift();
+  humHistory.push(currentHum); humHistory.shift();
+  tempChart.data.datasets[0].data=[...tempHistory];
+  humChart.data.datasets[0].data=[...humHistory];
+  const now=new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+  tempChart.data.labels.push(now); tempChart.data.labels.shift();
+  humChart.data.labels.push(now); humChart.data.labels.shift();
+  tempChart.update('none'); humChart.update('none');
+}, 3000);
+
+setInterval(() => addRekap(currentLevel, currentTemp, currentHum, pumpOn), 30000);
+
+updateTank(50); updateStatus(50); setPump(false);
+addRekap(50, 33, 61, false);
+</script>
+</body>
+</html>
